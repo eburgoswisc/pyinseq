@@ -108,3 +108,7 @@ fabric.properties
 \.idea/codeStyles/codeStyleConfig\.xml
 \.idea/codeStyles/Project\.xml
 \.vscode/settings\.json
+
+#  Everything IDE related
+.idea/*
+.idea

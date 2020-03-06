@@ -22,8 +22,6 @@ def test_pyinseq_script(datadir, tmpdir):
     args = [
         "-i",
         input_fn,
-        "-s",
-        sample_fn,
         "-g",
         gb_fn,
         "-e",
@@ -57,6 +55,49 @@ def test_pyinseq_script(datadir, tmpdir):
         assert not subdcmp.funny_files
         assert not subdcmp.left_only and not subdcmp.right_only
 
+
+def test_pyinseq_already_demultiplexed_input_script(datadir, tmpdir):
+    input_fn = datadir("input/")
+    gb_fn = datadir("input/ES114v2.gb")
+    output_name = "example_pyinseq"
+    expected_output = datadir("output_already_demultiplexed_pyinseq")
+    output_dir = tmpdir.join("results/output_already_demultiplexed_pyinseq")
+
+    args = [
+        "-i",
+        input_fn,
+        "-g",
+        gb_fn,
+        "-e",
+        output_name,
+        "-d",
+        "0.9",
+    ]
+    status, out, err = runscript("pyinseq", args, directory=str(tmpdir))
+
+    assert not status
+    dcmp = filecmp.dircmp(
+        expected_output,
+        output_dir,
+        ignore=["E001_01_bowtie.txt", "E001_02_bowtie.txt", ".DS_Store", "log.txt"],
+    )
+
+    # check that log file is created from pyinseq
+    assert "log.txt" in os.listdir(output_dir)
+
+    # checks that files are same in both directories
+    assert not dcmp.left_only and not dcmp.right_only
+
+    # check files to see if content differs
+    assert not dcmp.diff_files
+    assert not dcmp.funny_files  # Check for files that cannot be compared
+
+    # because subdirs is a dict keyed by subdir name
+    # with dircmp objects as values
+    for subdcmp in dcmp.subdirs.values():
+        assert not subdcmp.diff_files
+        assert not subdcmp.funny_files
+        assert not subdcmp.left_only and not subdcmp.right_only
 
 def test_pyinseq_demultiplex_script(datadir, tmpdir):
     input_fn = datadir("input/example01.fastq")
@@ -198,3 +239,5 @@ def test_pyinseq_genomeprep_gff_script(datadir, tmpdir):
         assert not subdcmp.diff_files
         assert not subdcmp.funny_files
         assert not subdcmp.left_only and not subdcmp.right_only
+
+
