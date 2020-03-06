@@ -24,6 +24,8 @@ def test_pyinseq_script(datadir, tmpdir):
         input_fn,
         "-g",
         gb_fn,
+        "-s",
+        sample_fn,
         "-e",
         output_name,
         "-d",
@@ -56,30 +58,19 @@ def test_pyinseq_script(datadir, tmpdir):
         assert not subdcmp.left_only and not subdcmp.right_only
 
 
-def test_pyinseq_already_demultiplexed_input_script(datadir, tmpdir):
-    input_fn = datadir("input/")
-    gb_fn = datadir("input/ES114v2.gb")
-    output_name = "example_pyinseq"
-    expected_output = datadir("output_already_demultiplexed_pyinseq")
-    output_dir = tmpdir.join("results/output_already_demultiplexed_pyinseq")
+def test_pyinseq_directory_script(datadir, tmpdir):
+    input_fn = datadir("input/example01.fastq")
+    sample_fn = datadir("input/example01.txt")
+    output_name = "example_demultiplex"
+    expected_output = datadir("output_demultiplex")
+    output_dir = tmpdir.join("results/example_demultiplex")
 
-    args = [
-        "-i",
-        input_fn,
-        "-g",
-        gb_fn,
-        "-e",
-        output_name,
-        "-d",
-        "0.9",
-    ]
+    args = ["demultiplex", "-i", input_fn, "-s", sample_fn, "-e", output_name]
     status, out, err = runscript("pyinseq", args, directory=str(tmpdir))
-
     assert not status
+
     dcmp = filecmp.dircmp(
-        expected_output,
-        output_dir,
-        ignore=["E001_01_bowtie.txt", "E001_02_bowtie.txt", ".DS_Store", "log.txt"],
+        expected_output, str(output_dir), ignore=[".DS_Store", "log.txt"]
     )
 
     # check that log file is created from pyinseq
@@ -98,6 +89,7 @@ def test_pyinseq_already_demultiplexed_input_script(datadir, tmpdir):
         assert not subdcmp.diff_files
         assert not subdcmp.funny_files
         assert not subdcmp.left_only and not subdcmp.right_only
+
 
 def test_pyinseq_demultiplex_script(datadir, tmpdir):
     input_fn = datadir("input/example01.fastq")
