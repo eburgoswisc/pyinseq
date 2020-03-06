@@ -7,6 +7,7 @@ import glob
 import logging
 import os
 import yaml
+import shutil
 
 from .analyze import t_fifty, spearman_correlation
 from .demultiplex import demultiplex_fastq
@@ -29,7 +30,7 @@ def parse_args(args):
         "-i", "--input", help="input Illumina reads file or folder", required=True
     )
     parser.add_argument(
-        "-s", "--samples", help="sample list with barcodes", required=True
+        "-s", "--samples", help="sample list with barcodes", required=False
     )
     parser.add_argument(
         "-e",
@@ -268,10 +269,10 @@ def directory_of_samples_to_dict(directory):
     return samples_dict
 
 
-def list_files(folder, ext="gz"):
+def list_files(folder):
     """Return list of .gz files from the specified folder."""
     with cd(folder):
-        return [f for f in glob.glob(f"*.{ext}")]
+        return [f for f in glob.glob(f"*.fastq*")]
 
 
 def build_fna_and_table_files(gbk_file, settings):
@@ -299,6 +300,9 @@ def pipeline_mapping(settings, samples_dict):
             # from where bowtie is called
             bowtie_in = "../" + sample + "_trimmed.fastq"
             bowtie_out = "../" + sample + "_bowtie.txt"
+            # If samples are already trimmed
+            if not settings.process_reads:
+                bowtie_in = "../" + sample + ".fastq"
             # map to bowtie and produce the output file
             logger.info(f"Sample {sample}: map reads with bowtie")
             bowtie_msg_out = bowtie_map(settings.organism, bowtie_in, bowtie_out)
@@ -378,8 +382,8 @@ def main(args):
     else:
         command = "pyinseq"
         args = parse_args(args)
-    # Initialize the settings object
-    settings = Settings(args.experiment)
+    # Initialize the settings object, configure experiment name top be valid
+    settings = Settings(convert_to_filename(args.experiment))
     settings._set_command_specific_settings(command)
     try:
         # for `pyinseq demultiplex` only
@@ -395,12 +399,18 @@ def main(args):
     # Keep intermediate files
     settings.keep_all = False  # args.keep_all
     if settings.process_reads:
-        reads = args.input
+        if os.path.isdir(args.input):
+            # No processing of reads, they are demultiplexed already
+            settings.process_reads = False
+            directory_of_sequence_files = args.input
+        else:
+            sequence_file = args.input
     if settings.parse_genbank_file:
         gbk_file = args.genome
         if settings.process_reads:
             _set_disruption(float(args.disruption), settings)
             _set_gene_parameters(int(args.min_count), int(args.max_ratio), settings)
+
     # sample names and paths
     if settings.process_sample_list:
         samples = args.samples
@@ -408,8 +418,7 @@ def main(args):
         if samples:
             samples_dict = tab_delimited_samples_to_dict(samples)
         else:
-            reads = os.path.abspath(reads)
-            samples_dict = directory_of_samples_to_dict(samples)
+            samples_dict = directory_of_samples_to_dict(directory_of_sequence_files)
     try:
         logger.debug(f"samples_dict: {samples_dict}")
     except (UnboundLocalError):
@@ -431,8 +440,13 @@ def main(args):
     # --- WRITE DEMULTIPLEXED AND TRIMMED FASTQ FILES --- #
     if settings.process_reads:
         logger.info("Demultiplex reads")
-        demultiplex_fastq(reads, samples_dict, settings)
-
+        demultiplex_fastq(sequence_file, samples_dict, settings)
+    else:
+        if settings.command == 'pyinseq':
+            # Copy sequences from input.
+            logger.info('Copying sequence files into pyinseq working directory.')
+            for f in list_files(directory_of_sequence_files):
+                shutil.copy(os.path.join(directory_of_sequence_files, f), settings.path)
     # --- MAPPING TO SITES AND GENES --- #
     if settings.parse_genbank_file:
         if not settings.gff:
@@ -445,6 +459,7 @@ def main(args):
                 "Prepare genome features (.ftt), fasta nucleotide (.fna), and GFF3 (.gff) files"
             )
             build_fna_and_table_files(gbk_file, settings)
+
     if settings.generate_bowtie_index:
         logger.info("Prepare bowtie index")
         build_bowtie_index(settings)
