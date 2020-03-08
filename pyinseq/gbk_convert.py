@@ -1,32 +1,9 @@
 #!/usr/bin/env python3
 """
-
 GenBank conversion utilities for the pyinseq pipeline.
 
 Files are written to genome_lookup/ directory for the EXPERIMENT:
     EXPERIMENT/genome_lookup/genome.fna
-
-# gbk2fna()
-Convert GenBank sequence to fasta sequence
-Multilocus GenBank converts to one multifasta GenBank file
-Locus headers are the fasta headers
-Maintains original newlines (typically leaving up to 60 nucleotides per line)
-
-# gbk2table()
-Convert GenBank to feature table
-Format similar to .ptt and .rnt files except:
-- full tabular (locus as a field)
-- start and end positions as separate fields
-- includes the following features:
-    CDS
-    rRNA
-    tRNA
-    misc_RNA
-- Multilocus GenBank converts to multi-.ftt file
-'Unlike .ptt files that show the number of amino acids as 'length'
-
-Optional convert to GFF3 format also.
-
 """
 
 import csv
@@ -37,15 +14,30 @@ import sys
 logger = logging.getLogger("pyinseq")
 
 
-def write_to_file(outfile, row_data):
+def write_to_file(outfile: str, row_data: list) -> None:
+    """
+    Write table data into output file using csv module
+    :param outfile: string to output filename
+    :param row_data: list with data as items
+    :return:
+    """
     with open(outfile, "w") as fo:
         writer = csv.writer(fo, delimiter="\t", lineterminator="\n")
         for row in row_data:
             writer.writerow(row)
+    return
 
 
-def gbk2fna(infile, organism, output_directory=""):
-    """Convert genbank format to fna format."""
+def gbk2fna(infile: str, organism: str, output_directory: str = "") -> dict:
+    """ Convert GenBank sequence to fasta (fna) sequence
+        Multilocus GenBank converts to one multifasta GenBank file
+        Locus headers are the fasta headers
+        Maintains original newlines (typically leaving up to 60 nucleotides per line)
+    :param infile: Path to GenBank file
+    :param organism: suffix to use for genome files created
+    :param output_directory: directory to place genome files
+    :return:
+    """
     with open(infile, "r") as fi:
         fna_rows = []
         n_nt = {}
@@ -78,8 +70,26 @@ def gbk2fna(infile, organism, output_directory=""):
         return {"fasta": fna_rows, "nucleotides": n_nt}
 
 
-def gbk2table(infile, organism, output_directory="", gff=False):
-    """Convert genbank format to feature table format (.ftt, and optionally .gff)."""
+def gbk2table(infile: str, organism: str, output_directory: str = "", gff: bool=False) -> None:
+    """ Convert genbank format to feature table format (.ftt, and optionally .gff).
+        Format similar to .ptt and .rnt files except:
+        - full tabular (locus as a field)
+        - start and end positions as separate fields
+        - includes the following features:
+            CDS
+            rRNA
+            tRNA
+            misc_RNA
+        - Multilocus GenBank converts to multi-.ftt file
+        'Unlike .ptt files that show the number of amino acids as 'length'
+
+        Optional convert to GFF3 format also.
+    :param infile: string of input genebank file
+    :param organism: string of organism name
+    :param output_directory: string to output directory to save files
+    :param gff: bool for formatting gff file
+    :return:
+    """
     with open(infile, "r") as fi:
         ftt_rows = [
             (
@@ -102,6 +112,7 @@ def gbk2table(infile, organism, output_directory="", gff=False):
         fna_rows = fasta["fasta"]
         fna_nucleotides = fasta["nucleotides"]
 
+
         if gff:
             gff_rows = [("##gff-version 3",)]
             for contig in fna_nucleotides:
@@ -112,6 +123,7 @@ def gbk2table(infile, organism, output_directory="", gff=False):
         # Initialize variables
         features = False  # in the FEATURES section of the GenBank file
         new_feature = False  # collecting data for a new feature
+        multiline_product = False  # append the current line to product
         parse_types = ["CDS", "tRNA", "rRNA", "misc_RNA"]
         type = "CDS"
         strand = "+"
@@ -122,7 +134,7 @@ def gbk2table(infile, organism, output_directory="", gff=False):
         code = "-"
         cog = "-"
         product = "-"
-        product_append = False  # append the current line to product
+
 
         for i, line in enumerate(fi):
 
@@ -144,7 +156,7 @@ def gbk2table(infile, organism, output_directory="", gff=False):
                     if line[5:21].rstrip():
                         if new_feature:
                             # if locus_tag:
-                            if not product_append:
+                            if not multiline_product:
                                 ftt_rows.append(
                                     (
                                         locus,
@@ -197,6 +209,8 @@ def gbk2table(infile, organism, output_directory="", gff=False):
                         #    (> / <) are removed.
                         # 2. Complicated features use only the outer bounds
                         #    join(481257..481331,481333..482355) uses 481257..482355
+                        # For gff files, remove the carat completely.
+                        parts[1] = parts[1].replace('>', '')
                         location = re.search(r"(\d+)\.+.*\.(\d+)", parts[1])
                         first = location.group(1)
                         last = location.group(2)
@@ -211,6 +225,7 @@ def gbk2table(infile, organism, output_directory="", gff=False):
                             exit(0)
                         strand = "-" if parts[1].startswith("complement") else "+"
 
+                    #
                     if "/protein_id=" in parts[0]:
                         protein_id = parts[0][13:-1]
 
@@ -221,19 +236,19 @@ def gbk2table(infile, organism, output_directory="", gff=False):
                         locus_tag = parts[0][12:-1]
 
                     # Multi-line product description
-                    if product_append:
+                    if multiline_product:
                         product = product + " " + line.strip()
                         if product.count('"') != 2:
-                            product_append = True
-                        # TODO(Error handling if not exactly 2 parentheses)
+                            continue
                         if product.count('"') == 2:
                             product = product.strip('"')
-                            product_append = False
+                            multiline_product = False
 
                     if "/product=" in parts[0]:
                         product = line.strip()[9:]
                         if product.count('"') != 2:
-                            product_append = True
+                            multiline_product = True
+
                         if product.count('"') == 2:
                             product = product.strip('"')
 
@@ -249,15 +264,8 @@ def gbk2table(infile, organism, output_directory="", gff=False):
         gff_rows = gff_rows + fna_rows
         outfile = f"{output_directory}{organism}.gff"
         write_to_file(outfile, gff_rows)
-
-
-def main():
-    """Start here."""
-    input_file = sys.argv[1]
-    organism = sys.argv[2]
-    # gbk2fna(input_file, organism)
-    gbk2table(input_file, organism, gff=True)
+    return
 
 
 if __name__ == "__main__":
-    main()
+    pass
