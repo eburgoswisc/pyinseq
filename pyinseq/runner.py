@@ -123,7 +123,10 @@ def genomeprep_parse_args(args):
         required=False,
     )
     parser.add_argument(
-        "-gff", "--gff", help="generate GFF3 file", action="store_true", required=False
+        "-gff", "--gff", help="generate GFF3 file",
+        action="store_true",
+        required=False,
+        default=False
     )
     return parser.parse_args(args)
 
@@ -407,6 +410,9 @@ def main(args):
             sequence_file = args.input
     if settings.parse_genbank_file:
         gbk_file = args.genome
+        # Check if GenBank file is gbff version
+        if args.gff:
+            settings.gff = True
         if settings.process_reads:
             _set_disruption(float(args.disruption), settings)
             _set_gene_parameters(int(args.min_count), int(args.max_ratio), settings)
@@ -449,16 +455,13 @@ def main(args):
                 shutil.copy(os.path.join(directory_of_sequence_files, f), settings.path)
     # --- MAPPING TO SITES AND GENES --- #
     if settings.parse_genbank_file:
-        if not settings.gff:
-            logger.info(
-                "Prepare genome features (.ftt) and fasta nucleotide (.fna) files"
-            )
-            build_fna_and_table_files(gbk_file, settings)
-        else:
-            logger.info(
-                "Prepare genome features (.ftt), fasta nucleotide (.fna), and GFF3 (.gff) files"
-            )
-            build_fna_and_table_files(gbk_file, settings)
+        gff_message = ''
+        if settings.gff:
+            gff_message = f" , and GFF3 (.gff) files"
+        logger.info(
+            f"Prepare genome features (.ftt), fasta nucleotide (.fna){gff_message}"
+        )
+        build_fna_and_table_files(gbk_file, settings)
 
     if settings.generate_bowtie_index:
         logger.info("Prepare bowtie index")
