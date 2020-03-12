@@ -55,6 +55,12 @@ def parse_args(args):
         help="Maximum ratio of left:right or right:left reads per insertion site",
         default=10,
     )
+    parser.add_argument(
+        "-gff", "--gff", help="generate GFF3 file",
+        action="store_true",
+        required=False,
+        default=False
+    )
     """Inactive arguments in current version
     parser.add_argument('-s', '--samples',
                         help='sample list with barcodes. \
@@ -388,13 +394,14 @@ def main(args):
     # Initialize the settings object, configure experiment name top be valid
     settings = Settings(convert_to_filename(args.experiment))
     settings._set_command_specific_settings(command)
+    # TODO: This are command specific settings that are set later. Maybe they should be refactored
+    #  to be set in command specific functions
     try:
         # for `pyinseq demultiplex` only
         settings.write_trimmed_reads = not args.notrim
     except:
         pass
     try:
-        # for `pyinseq genomeprep` only
         settings.generate_bowtie_index = not args.noindex
         settings.gff = args.gff
     except:
