@@ -25,10 +25,10 @@ def map_sites(sample, samples_dict, settings):
                 int(bowtie_data[3]),
                 len(bowtie_data[4]),
             )
-            if bowtie_data[1] == "+":  # positive strand read
+            if bowtie_data[1] == "-":  # negative strand read
                 insertion_NT = insertion_NT + read_length - 1
                 map_dict.setdefault((contig, insertion_NT), [0, 0])[0] += 1  # left
-            else:  # negative strand read
+            else:  # positive strand read
                 insertion_NT = insertion_NT + 1
                 map_dict.setdefault((contig, insertion_NT), [0, 0])[1] += 1  # right
             overall_total += 1
@@ -131,7 +131,7 @@ def map_genes(sample, settings):
                             * settings.max_ratio
                         ) >= max(int(left_counts), int(right_counts)):
                             mapped_hit_list.append(mappedHit)
-                            # Filter based on location in the gene
+                            # Filter based on location in the gene for summary gene table
                             if three_primeness <= settings.disruption:
                                 # Add to the total for that gene --
                                 # Single-element list (rather than integer) so
@@ -208,6 +208,7 @@ def build_gene_table(organism, sample_dict, gene_mappings, experiment=""):
                 # matches based on locus_tag.
                 if hit_locus_tag == ftt_locus_tag:
                     gene_table[i][current_column] += mapped_genes[gene][0]
+        # Write table to an output table
         with open(f"results/{experiment}/summary_gene_table.txt", "w") as fo:
             writer = csv.writer(
                 fo, delimiter="\t", dialect="excel", lineterminator="\n"
