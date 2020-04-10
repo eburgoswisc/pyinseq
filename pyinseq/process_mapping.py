@@ -25,10 +25,10 @@ def map_sites(sample, samples_dict, settings):
                 int(bowtie_data[3]),
                 len(bowtie_data[4]),
             )
-            if bowtie_data[1] == "-":  # negative strand read
+            if bowtie_data[1] == "+":  # negative strand read
                 insertion_NT = insertion_NT + read_length - 1
                 map_dict.setdefault((contig, insertion_NT), [0, 0])[0] += 1  # left
-            else:  # positive strand read
+            else:  # negative strand read
                 insertion_NT = insertion_NT + 1
                 map_dict.setdefault((contig, insertion_NT), [0, 0])[1] += 1  # right
             overall_total += 1
